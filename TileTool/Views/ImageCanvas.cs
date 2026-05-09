@@ -259,6 +259,12 @@ public class ImageCanvas : Control
             _sizeInputText = string.Empty;
         }
 
+        if ((c == 'x' || c == 'X') && _sizeInputText.Contains('x'))
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (_sizeInputText.Length < MaxInputLength)
         {
             _sizeInputText += char.ToLowerInvariant(c);
@@ -490,7 +496,7 @@ public class ImageCanvas : Control
 
     private void DrawSizeInputOverlay(DrawingContext context, Rect selRect)
     {
-        string inputText = string.IsNullOrEmpty(_sizeInputText) ? "32x64|" : $"{_sizeInputText}|";
+        string inputText = string.IsNullOrEmpty(_sizeInputText) ? "WxH|" : $"{_sizeInputText}|";
         var textLayout = new FormattedText(
             inputText,
             CultureInfo.CurrentCulture,
@@ -539,7 +545,7 @@ public class ImageCanvas : Control
         if (parts.Length != 2)
             return;
 
-        if (!int.TryParse(parts[0].Trim(), out int width) || !int.TryParse(parts[1].Trim(), out int height))
+        if (!int.TryParse(parts[0], out int width) || !int.TryParse(parts[1], out int height))
             return;
 
         width = Math.Clamp(width, 1, ImageSource.PixelSize.Width);

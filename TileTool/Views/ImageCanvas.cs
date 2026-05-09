@@ -89,6 +89,7 @@ public class ImageCanvas : Control
     private const double OverlayFontSize = 12;
     private const double OverlayPadding = 6;
     private const int MaxInputLength = 16;
+    private const double MinInputOverlayWidth = 90;
 
     private bool _isSizeInputActive;
     private string _sizeInputText = string.Empty;
@@ -465,7 +466,7 @@ public class ImageCanvas : Control
 
     private void DrawSelectionSizeLabel(DrawingContext context, Rect selRect)
     {
-        string label = $"{Math.Round(SelectionWidth)}×{Math.Round(SelectionHeight)} px";
+        string label = $"{Math.Round(SelectionWidth)}x{Math.Round(SelectionHeight)} px";
         var textLayout = new FormattedText(
             label,
             CultureInfo.CurrentCulture,
@@ -473,12 +474,14 @@ public class ImageCanvas : Control
             OverlayTypeface,
             OverlayFontSize,
             LabelTextBrush);
-        var pos = GetOverlayPosition(selRect, textLayout.Height + OverlayPadding * 2);
+        double panelWidth = textLayout.Width + OverlayPadding * 2;
+        double panelHeight = textLayout.Height + OverlayPadding * 2;
+        var pos = GetOverlayPosition(selRect, panelWidth, panelHeight);
         var panelRect = new Rect(
             pos.X,
             pos.Y,
-            textLayout.Width + OverlayPadding * 2,
-            textLayout.Height + OverlayPadding * 2);
+            panelWidth,
+            panelHeight);
 
         context.FillRectangle(LabelBackgroundBrush, panelRect);
         context.DrawRectangle(null, LabelBorderPen, panelRect);
@@ -487,7 +490,7 @@ public class ImageCanvas : Control
 
     private void DrawSizeInputOverlay(DrawingContext context, Rect selRect)
     {
-        string inputText = $"{_sizeInputText}|";
+        string inputText = string.IsNullOrEmpty(_sizeInputText) ? "32x64|" : $"{_sizeInputText}|";
         var textLayout = new FormattedText(
             inputText,
             CultureInfo.CurrentCulture,
@@ -495,21 +498,23 @@ public class ImageCanvas : Control
             OverlayTypeface,
             OverlayFontSize,
             InputTextBrush);
-        var pos = GetOverlayPosition(selRect, (textLayout.Height + OverlayPadding * 2) * 2 + 4);
-        pos = new Point(pos.X, pos.Y + textLayout.Height + OverlayPadding * 2 + 4);
+        double panelWidth = Math.Max(MinInputOverlayWidth, textLayout.Width + OverlayPadding * 2);
+        double panelHeight = textLayout.Height + OverlayPadding * 2;
+        var pos = GetOverlayPosition(selRect, panelWidth, panelHeight * 2 + 4);
+        pos = new Point(pos.X, pos.Y + panelHeight + 4);
 
         var panelRect = new Rect(
             pos.X,
             pos.Y,
-            Math.Max(90, textLayout.Width + OverlayPadding * 2),
-            textLayout.Height + OverlayPadding * 2);
+            panelWidth,
+            panelHeight);
 
         context.FillRectangle(InputBackgroundBrush, panelRect);
         context.DrawRectangle(null, LabelBorderPen, panelRect);
         context.DrawText(textLayout, new Point(pos.X + OverlayPadding, pos.Y + OverlayPadding));
     }
 
-    private Point GetOverlayPosition(Rect selRect, double overlayHeight)
+    private Point GetOverlayPosition(Rect selRect, double overlayWidth, double overlayHeight)
     {
         double x = selRect.Left + 4;
         double y = selRect.Top - overlayHeight - 4;
@@ -519,7 +524,7 @@ public class ImageCanvas : Control
         if (ImageSource != null)
         {
             y = Clamp(y, 0, Math.Max(0, ImageSource.PixelSize.Height - overlayHeight));
-            x = Clamp(x, 0, Math.Max(0, ImageSource.PixelSize.Width - 120));
+            x = Clamp(x, 0, Math.Max(0, ImageSource.PixelSize.Width - overlayWidth));
         }
 
         return new Point(x, y);
@@ -530,11 +535,11 @@ public class ImageCanvas : Control
         if (ImageSource == null || string.IsNullOrWhiteSpace(_sizeInputText))
             return;
 
-        var parts = _sizeInputText.Split('x', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var parts = _sizeInputText.Split('x', StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length != 2)
             return;
 
-        if (!int.TryParse(parts[0], out int width) || !int.TryParse(parts[1], out int height))
+        if (!int.TryParse(parts[0].Trim(), out int width) || !int.TryParse(parts[1].Trim(), out int height))
             return;
 
         width = Math.Clamp(width, 1, ImageSource.PixelSize.Width);

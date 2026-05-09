@@ -102,6 +102,11 @@
                                    SelectionY="{Binding SelectionY}"
                                    SelectionWidth="{Binding SelectionWidth}"
                                    SelectionHeight="{Binding SelectionHeight}"
+                                   HasGhost="{Binding HasGhost}"
+                                   GhostX="{Binding GhostX}"
+                                   GhostY="{Binding GhostY}"
+                                   GhostWidth="{Binding GhostWidth}"
+                                   GhostHeight="{Binding GhostHeight}"
                                    HorizontalAlignment="Left"
                                    VerticalAlignment="Top"/>
             </ScrollViewer>

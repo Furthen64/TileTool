@@ -15,7 +15,10 @@ public partial class MainWindow : Window
     {
         base.OnOpened(e);
         if (DataContext is MainWindowViewModel vm)
+        {
             vm.OwnerWindow = this;
+            vm.SelectOutputFolderCommand.Execute(null);
+        }
     }
 
     protected override void OnKeyDown(KeyEventArgs e)

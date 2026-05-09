@@ -56,6 +56,21 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private double _imageDisplayHeight;
 
+    [ObservableProperty]
+    private bool _hasGhost;
+
+    [ObservableProperty]
+    private double _ghostX;
+
+    [ObservableProperty]
+    private double _ghostY;
+
+    [ObservableProperty]
+    private double _ghostWidth;
+
+    [ObservableProperty]
+    private double _ghostHeight;
+
     private TileToolConfig _config = new();
     private string? _currentImagePath;
 
@@ -94,6 +109,7 @@ public partial class MainWindowViewModel : ViewModelBase
             HasImage = true;
             ImageDisplayWidth = LoadedImage.PixelSize.Width;
             ImageDisplayHeight = LoadedImage.PixelSize.Height;
+            HasGhost = false;
 
             // Apply default selection size
             SelectionWidth = _config.DefaultSelectionWidth;
@@ -156,16 +172,34 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
         }
 
+        // Snapshot the current selection — this is what gets saved and becomes the ghost
+        double snapX = SelectionX;
+        double snapY = SelectionY;
+        double snapW = SelectionWidth;
+        double snapH = SelectionHeight;
+
+        // Record the snapshot as the ghost overlay
+        GhostX = snapX;
+        GhostY = snapY;
+        GhostWidth = snapW;
+        GhostHeight = snapH;
+        HasGhost = true;
+
+        // Advance selection right by one tile width if it stays within the image
+        double nextX = snapX + snapW;
+        if (nextX + snapW <= ImageDisplayWidth)
+            SelectionX = nextX;
+
         try
         {
             // Compute the actual pixel coordinates on the original image
             double scaleX = LoadedImage.PixelSize.Width / ImageDisplayWidth;
             double scaleY = LoadedImage.PixelSize.Height / ImageDisplayHeight;
 
-            int srcX = (int)Math.Round(SelectionX * scaleX);
-            int srcY = (int)Math.Round(SelectionY * scaleY);
-            int srcW = (int)Math.Round(SelectionWidth * scaleX);
-            int srcH = (int)Math.Round(SelectionHeight * scaleY);
+            int srcX = (int)Math.Round(snapX * scaleX);
+            int srcY = (int)Math.Round(snapY * scaleY);
+            int srcW = (int)Math.Round(snapW * scaleX);
+            int srcH = (int)Math.Round(snapH * scaleY);
 
             // Clamp to image bounds
             srcX = Math.Max(0, Math.Min(srcX, LoadedImage.PixelSize.Width - 1));

@@ -31,6 +31,21 @@ public class ImageCanvas : Control
     public static readonly StyledProperty<double> SelectionHeightProperty =
         AvaloniaProperty.Register<ImageCanvas, double>(nameof(SelectionHeight), 32, defaultBindingMode: Avalonia.Data.BindingMode.TwoWay);
 
+    public static readonly StyledProperty<bool> HasGhostProperty =
+        AvaloniaProperty.Register<ImageCanvas, bool>(nameof(HasGhost), false);
+
+    public static readonly StyledProperty<double> GhostXProperty =
+        AvaloniaProperty.Register<ImageCanvas, double>(nameof(GhostX), 0);
+
+    public static readonly StyledProperty<double> GhostYProperty =
+        AvaloniaProperty.Register<ImageCanvas, double>(nameof(GhostY), 0);
+
+    public static readonly StyledProperty<double> GhostWidthProperty =
+        AvaloniaProperty.Register<ImageCanvas, double>(nameof(GhostWidth), 0);
+
+    public static readonly StyledProperty<double> GhostHeightProperty =
+        AvaloniaProperty.Register<ImageCanvas, double>(nameof(GhostHeight), 0);
+
     public Bitmap? ImageSource
     {
         get => GetValue(ImageSourceProperty);
@@ -61,6 +76,36 @@ public class ImageCanvas : Control
         set => SetValue(SelectionHeightProperty, value);
     }
 
+    public bool HasGhost
+    {
+        get => GetValue(HasGhostProperty);
+        set => SetValue(HasGhostProperty, value);
+    }
+
+    public double GhostX
+    {
+        get => GetValue(GhostXProperty);
+        set => SetValue(GhostXProperty, value);
+    }
+
+    public double GhostY
+    {
+        get => GetValue(GhostYProperty);
+        set => SetValue(GhostYProperty, value);
+    }
+
+    public double GhostWidth
+    {
+        get => GetValue(GhostWidthProperty);
+        set => SetValue(GhostWidthProperty, value);
+    }
+
+    public double GhostHeight
+    {
+        get => GetValue(GhostHeightProperty);
+        set => SetValue(GhostHeightProperty, value);
+    }
+
     // ── Interaction State ────────────────────────────────────────────────────
 
     private enum DragMode { None, Move, ResizeN, ResizeS, ResizeE, ResizeW, ResizeNE, ResizeNW, ResizeSE, ResizeSW, Create }
@@ -77,6 +122,8 @@ public class ImageCanvas : Control
     private static readonly IBrush OverlayBrush = new SolidColorBrush(Color.FromArgb(60, 0, 0, 0));
     private static readonly IPen SelectionPen = new Pen(Brushes.White, 1.5, dashStyle: DashStyle.Dash);
     private static readonly IPen SelectionPenSolid = new Pen(Brushes.CornflowerBlue, 1.5);
+    private static readonly IPen GhostPen = new Pen(new SolidColorBrush(Color.FromArgb(180, 255, 165, 0)), 1.5, dashStyle: DashStyle.Dash);
+    private static readonly IBrush GhostFill = new SolidColorBrush(Color.FromArgb(30, 255, 165, 0));
     private static readonly IBrush HandleFill = Brushes.White;
     private static readonly IPen HandlePen = new Pen(Brushes.CornflowerBlue, 1.5);
     private static readonly IBrush LabelBackgroundBrush = new SolidColorBrush(Color.FromArgb(220, 26, 26, 26));
@@ -103,7 +150,12 @@ public class ImageCanvas : Control
             SelectionXProperty,
             SelectionYProperty,
             SelectionWidthProperty,
-            SelectionHeightProperty);
+            SelectionHeightProperty,
+            HasGhostProperty,
+            GhostXProperty,
+            GhostYProperty,
+            GhostWidthProperty,
+            GhostHeightProperty);
     }
 
     public ImageCanvas()
@@ -138,6 +190,14 @@ public class ImageCanvas : Control
         // Draw dark overlay around selection
         var selRect = GetSelectionRect();
         DrawDimOverlay(context, imgRect, selRect);
+
+        // Draw ghost (previous saved selection)
+        if (HasGhost && GhostWidth > 0 && GhostHeight > 0)
+        {
+            var ghostRect = new Rect(GhostX, GhostY, GhostWidth, GhostHeight);
+            context.FillRectangle(GhostFill, ghostRect);
+            context.DrawRectangle(null, GhostPen, ghostRect.Inflate(0.5));
+        }
 
         // Selection rectangle border
         context.DrawRectangle(null, SelectionPenSolid, selRect.Inflate(0.5));

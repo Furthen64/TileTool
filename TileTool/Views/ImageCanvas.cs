@@ -46,6 +46,21 @@ public class ImageCanvas : Control
     public static readonly StyledProperty<double> GhostHeightProperty =
         AvaloniaProperty.Register<ImageCanvas, double>(nameof(GhostHeight), 0);
 
+    public static readonly StyledProperty<bool> HasGridProperty =
+        AvaloniaProperty.Register<ImageCanvas, bool>(nameof(HasGrid), false);
+
+    public static readonly StyledProperty<double> GridOriginXProperty =
+        AvaloniaProperty.Register<ImageCanvas, double>(nameof(GridOriginX), 0);
+
+    public static readonly StyledProperty<double> GridOriginYProperty =
+        AvaloniaProperty.Register<ImageCanvas, double>(nameof(GridOriginY), 0);
+
+    public static readonly StyledProperty<double> GridCellWidthProperty =
+        AvaloniaProperty.Register<ImageCanvas, double>(nameof(GridCellWidth), 0);
+
+    public static readonly StyledProperty<double> GridCellHeightProperty =
+        AvaloniaProperty.Register<ImageCanvas, double>(nameof(GridCellHeight), 0);
+
     public Bitmap? ImageSource
     {
         get => GetValue(ImageSourceProperty);
@@ -104,6 +119,36 @@ public class ImageCanvas : Control
     {
         get => GetValue(GhostHeightProperty);
         set => SetValue(GhostHeightProperty, value);
+    }
+
+    public bool HasGrid
+    {
+        get => GetValue(HasGridProperty);
+        set => SetValue(HasGridProperty, value);
+    }
+
+    public double GridOriginX
+    {
+        get => GetValue(GridOriginXProperty);
+        set => SetValue(GridOriginXProperty, value);
+    }
+
+    public double GridOriginY
+    {
+        get => GetValue(GridOriginYProperty);
+        set => SetValue(GridOriginYProperty, value);
+    }
+
+    public double GridCellWidth
+    {
+        get => GetValue(GridCellWidthProperty);
+        set => SetValue(GridCellWidthProperty, value);
+    }
+
+    public double GridCellHeight
+    {
+        get => GetValue(GridCellHeightProperty);
+        set => SetValue(GridCellHeightProperty, value);
     }
 
     // ── Interaction State ────────────────────────────────────────────────────
@@ -383,6 +428,11 @@ public class ImageCanvas : Control
             case DragMode.Move:
                 x = Clamp(_dragOrigX + delta.X, 0, imgW - w);
                 y = Clamp(_dragOrigY + delta.Y, 0, imgH - h);
+                if (HasGrid && GridCellWidth > 0 && GridCellHeight > 0)
+                {
+                    x = Clamp(SnapAxis(x, GridOriginX, GridCellWidth), 0, imgW - w);
+                    y = Clamp(SnapAxis(y, GridOriginY, GridCellHeight), 0, imgH - h);
+                }
                 break;
 
             case DragMode.Create:
@@ -466,8 +516,15 @@ public class ImageCanvas : Control
             if (ImageSource != null && pos.X >= 0 && pos.Y >= 0 &&
                 pos.X <= ImageSource.PixelSize.Width && pos.Y <= ImageSource.PixelSize.Height)
             {
-                SelectionX = Math.Round(pos.X);
-                SelectionY = Math.Round(pos.Y);
+                double sx = Math.Round(pos.X);
+                double sy = Math.Round(pos.Y);
+                if (HasGrid && GridCellWidth > 0 && GridCellHeight > 0)
+                {
+                    sx = Clamp(SnapAxis(sx, GridOriginX, GridCellWidth), 0, ImageSource.PixelSize.Width);
+                    sy = Clamp(SnapAxis(sy, GridOriginY, GridCellHeight), 0, ImageSource.PixelSize.Height);
+                }
+                SelectionX = sx;
+                SelectionY = sy;
                 SelectionWidth = 1;
                 SelectionHeight = 1;
                 return DragMode.Create;
@@ -529,6 +586,9 @@ public class ImageCanvas : Control
 
     private static double Clamp(double v, double min, double max) =>
         Math.Max(min, Math.Min(max, v));
+
+    private static double SnapAxis(double value, double origin, double cellSize) =>
+        origin + Math.Round((value - origin) / cellSize) * cellSize;
 
     private void DrawSelectionSizeLabel(DrawingContext context, Rect selRect)
     {

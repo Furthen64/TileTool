@@ -71,6 +71,21 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private double _ghostHeight;
 
+    [ObservableProperty]
+    private bool _hasGrid;
+
+    [ObservableProperty]
+    private double _gridOriginX;
+
+    [ObservableProperty]
+    private double _gridOriginY;
+
+    [ObservableProperty]
+    private double _gridCellWidth;
+
+    [ObservableProperty]
+    private double _gridCellHeight;
+
     private TileToolConfig _config = new();
     private string? _currentImagePath;
 
@@ -110,6 +125,7 @@ public partial class MainWindowViewModel : ViewModelBase
             ImageDisplayWidth = LoadedImage.PixelSize.Width;
             ImageDisplayHeight = LoadedImage.PixelSize.Height;
             HasGhost = false;
+            HasGrid = false;
 
             // Apply default selection size
             SelectionWidth = _config.DefaultSelectionWidth;
@@ -184,6 +200,13 @@ public partial class MainWindowViewModel : ViewModelBase
         GhostWidth = snapW;
         GhostHeight = snapH;
         HasGhost = true;
+
+        // Establish (or update) the active grid from this saved tile
+        GridOriginX = snapX;
+        GridOriginY = snapY;
+        GridCellWidth = snapW;
+        GridCellHeight = snapH;
+        HasGrid = true;
 
         // Advance selection right by one tile width if it stays within the image
         double nextX = snapX + snapW;

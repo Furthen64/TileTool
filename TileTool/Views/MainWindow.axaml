@@ -1,0 +1,111 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:TileTool.ViewModels"
+        xmlns:views="using:TileTool.Views"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="700"
+        x:Class="TileTool.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="TileTool"
+        MinWidth="800" MinHeight="600"
+        Width="1100" Height="750">
+
+    <DockPanel>
+        <!-- Top Toolbar -->
+        <Border DockPanel.Dock="Top" Background="#2D2D2D" Padding="8,6">
+            <WrapPanel Orientation="Horizontal">
+                <Button Content="📁 Open Image"
+                        Command="{Binding OpenImageCommand}"
+                        Margin="0,0,6,0" Padding="10,6"/>
+                <Button Content="📂 Output Folder"
+                        Command="{Binding SelectOutputFolderCommand}"
+                        Margin="0,0,6,0" Padding="10,6"/>
+                <Separator Width="1" Background="#555" Margin="4,0"/>
+                <TextBlock Text="Prefix:" VerticalAlignment="Center" Margin="8,0,4,0" Foreground="White"/>
+                <TextBox Text="{Binding Prefix}"
+                         Width="160" Margin="0,0,6,0"
+                         Watermark="e.g. grasstiles"/>
+                <Separator Width="1" Background="#555" Margin="4,0"/>
+                <TextBlock Text="W:" VerticalAlignment="Center" Margin="8,0,2,0" Foreground="White"/>
+                <NumericUpDown Value="{Binding SelectionWidth}"
+                               Minimum="1" Maximum="4096"
+                               FormatString="0"
+                               Width="80" Margin="0,0,4,0"/>
+                <TextBlock Text="H:" VerticalAlignment="Center" Margin="4,0,2,0" Foreground="White"/>
+                <NumericUpDown Value="{Binding SelectionHeight}"
+                               Minimum="1" Maximum="4096"
+                               FormatString="0"
+                               Width="80" Margin="0,0,6,0"/>
+                <Button Content="💾 Save as Default Size"
+                        Command="{Binding SaveDefaultSizeCommand}"
+                        Margin="0,0,6,0" Padding="10,6"/>
+                <Separator Width="1" Background="#555" Margin="4,0"/>
+                <TextBlock Text="Next #:" VerticalAlignment="Center" Margin="8,0,4,0" Foreground="White"/>
+                <NumericUpDown Value="{Binding NextTileIndex}"
+                               Minimum="1" Maximum="99999"
+                               FormatString="0"
+                               Width="80" Margin="0,0,6,0"/>
+                <TextBlock Text="[Space] = Save Tile" VerticalAlignment="Center"
+                           Foreground="#AAAAAA" Margin="10,0,0,0"
+                           FontStyle="Italic"/>
+            </WrapPanel>
+        </Border>
+
+        <!-- Status Bar -->
+        <Border DockPanel.Dock="Bottom" Background="#1E1E1E" Padding="8,4">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0"
+                           Text="{Binding StatusMessage}"
+                           Foreground="#CCCCCC"
+                           VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="1"
+                           Foreground="#888888"
+                           VerticalAlignment="Center"
+                           Margin="16,0,0,0">
+                    <TextBlock.Text>
+                        <MultiBinding StringFormat="Selection: ({0:F0}, {1:F0})  {2:F0}×{3:F0}">
+                            <Binding Path="SelectionX"/>
+                            <Binding Path="SelectionY"/>
+                            <Binding Path="SelectionWidth"/>
+                            <Binding Path="SelectionHeight"/>
+                        </MultiBinding>
+                    </TextBlock.Text>
+                </TextBlock>
+            </Grid>
+        </Border>
+
+        <!-- Main image area -->
+        <Grid>
+            <!-- Placeholder when no image is loaded -->
+            <Border IsVisible="{Binding !HasImage}"
+                    Background="#1A1A1A"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Stretch">
+                <TextBlock Text="Open an image to get started.&#10;&#10;Use the toolbar above to open an image and select an output folder,&#10;then drag a selection rectangle over your tile and press [Space] to save it."
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           TextAlignment="Center"
+                           Foreground="#666666"
+                           FontSize="16"/>
+            </Border>
+
+            <!-- Image canvas with selection overlay -->
+            <ScrollViewer IsVisible="{Binding HasImage}"
+                          HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Auto"
+                          Background="#1A1A1A">
+                <views:ImageCanvas x:Name="TileCanvas"
+                                   ImageSource="{Binding LoadedImage}"
+                                   SelectionX="{Binding SelectionX}"
+                                   SelectionY="{Binding SelectionY}"
+                                   SelectionWidth="{Binding SelectionWidth}"
+                                   SelectionHeight="{Binding SelectionHeight}"
+                                   HorizontalAlignment="Left"
+                                   VerticalAlignment="Top"/>
+            </ScrollViewer>
+        </Grid>
+    </DockPanel>
+</Window>
+

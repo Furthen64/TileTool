@@ -4,6 +4,7 @@ using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using System;
+using System.Globalization;
 
 namespace TileTool.Views;
 
@@ -78,6 +79,20 @@ public class ImageCanvas : Control
     private static readonly IPen SelectionPenSolid = new Pen(Brushes.CornflowerBlue, 1.5);
     private static readonly IBrush HandleFill = Brushes.White;
     private static readonly IPen HandlePen = new Pen(Brushes.CornflowerBlue, 1.5);
+    private static readonly IBrush LabelBackgroundBrush = new SolidColorBrush(Color.FromArgb(220, 26, 26, 26));
+    private static readonly IPen LabelBorderPen = new Pen(Brushes.CornflowerBlue, 1);
+    private static readonly IBrush LabelTextBrush = Brushes.White;
+    private static readonly IBrush InputBackgroundBrush = new SolidColorBrush(Color.FromArgb(235, 16, 16, 16));
+    private static readonly IBrush InputTextBrush = Brushes.White;
+    private static readonly Typeface OverlayTypeface = new("Inter, Segoe UI, Arial");
+
+    private const double OverlayFontSize = 12;
+    private const double OverlayPadding = 6;
+    private const int MaxInputLength = 16;
+    private const double MinInputOverlayWidth = 90;
+
+    private bool _isSizeInputActive;
+    private string _sizeInputText = string.Empty;
 
     // ── Constructor ──────────────────────────────────────────────────────────
 
@@ -130,6 +145,11 @@ public class ImageCanvas : Control
 
         // Draw resize handles
         DrawHandles(context, selRect);
+
+        // Draw floating size label and optional input field
+        DrawSelectionSizeLabel(context, selRect);
+        if (_isSizeInputActive)
+            DrawSizeInputOverlay(context, selRect);
     }
 
     private void DrawDimOverlay(DrawingContext ctx, Rect image, Rect sel)
@@ -221,6 +241,72 @@ public class ImageCanvas : Control
         _dragMode = DragMode.None;
         e.Pointer.Capture(null);
         e.Handled = true;
+    }
+
+    protected override void OnTextInput(TextInputEventArgs e)
+    {
+        base.OnTextInput(e);
+        if (ImageSource == null || string.IsNullOrEmpty(e.Text))
+            return;
+
+        char c = e.Text[0];
+        if (!(char.IsDigit(c) || c == 'x' || c == 'X'))
+            return;
+
+        if (!_isSizeInputActive)
+        {
+            _isSizeInputActive = true;
+            _sizeInputText = string.Empty;
+        }
+
+        if ((c == 'x' || c == 'X') && _sizeInputText.Contains('x'))
+        {
+            e.Handled = true;
+            return;
+        }
+
+        if (_sizeInputText.Length < MaxInputLength)
+        {
+            _sizeInputText += char.ToLowerInvariant(c);
+            InvalidateVisual();
+        }
+
+        e.Handled = true;
+    }
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+
+        if (!_isSizeInputActive)
+            return;
+
+        switch (e.Key)
+        {
+            case Key.Back:
+                if (_sizeInputText.Length > 0)
+                {
+                    _sizeInputText = _sizeInputText[..^1];
+                    InvalidateVisual();
+                }
+                e.Handled = true;
+                break;
+
+            case Key.Enter:
+                TryApplyTypedSize();
+                _isSizeInputActive = false;
+                _sizeInputText = string.Empty;
+                InvalidateVisual();
+                e.Handled = true;
+                break;
+
+            case Key.Escape:
+                _isSizeInputActive = false;
+                _sizeInputText = string.Empty;
+                InvalidateVisual();
+                e.Handled = true;
+                break;
+        }
     }
 
     private void ApplyDrag(Vector delta)
@@ -383,4 +469,91 @@ public class ImageCanvas : Control
 
     private static double Clamp(double v, double min, double max) =>
         Math.Max(min, Math.Min(max, v));
+
+    private void DrawSelectionSizeLabel(DrawingContext context, Rect selRect)
+    {
+        string label = $"{Math.Round(SelectionWidth)}x{Math.Round(SelectionHeight)} px";
+        var textLayout = new FormattedText(
+            label,
+            CultureInfo.CurrentCulture,
+            FlowDirection.LeftToRight,
+            OverlayTypeface,
+            OverlayFontSize,
+            LabelTextBrush);
+        double panelWidth = textLayout.Width + OverlayPadding * 2;
+        double panelHeight = textLayout.Height + OverlayPadding * 2;
+        var pos = GetOverlayPosition(selRect, panelWidth, panelHeight);
+        var panelRect = new Rect(
+            pos.X,
+            pos.Y,
+            panelWidth,
+            panelHeight);
+
+        context.FillRectangle(LabelBackgroundBrush, panelRect);
+        context.DrawRectangle(null, LabelBorderPen, panelRect);
+        context.DrawText(textLayout, new Point(pos.X + OverlayPadding, pos.Y + OverlayPadding));
+    }
+
+    private void DrawSizeInputOverlay(DrawingContext context, Rect selRect)
+    {
+        string inputText = string.IsNullOrEmpty(_sizeInputText) ? "WxH|" : $"{_sizeInputText}|";
+        var textLayout = new FormattedText(
+            inputText,
+            CultureInfo.CurrentCulture,
+            FlowDirection.LeftToRight,
+            OverlayTypeface,
+            OverlayFontSize,
+            InputTextBrush);
+        double panelWidth = Math.Max(MinInputOverlayWidth, textLayout.Width + OverlayPadding * 2);
+        double panelHeight = textLayout.Height + OverlayPadding * 2;
+        var pos = GetOverlayPosition(selRect, panelWidth, panelHeight * 2 + 4);
+        pos = new Point(pos.X, pos.Y + panelHeight + 4);
+
+        var panelRect = new Rect(
+            pos.X,
+            pos.Y,
+            panelWidth,
+            panelHeight);
+
+        context.FillRectangle(InputBackgroundBrush, panelRect);
+        context.DrawRectangle(null, LabelBorderPen, panelRect);
+        context.DrawText(textLayout, new Point(pos.X + OverlayPadding, pos.Y + OverlayPadding));
+    }
+
+    private Point GetOverlayPosition(Rect selRect, double overlayWidth, double overlayHeight)
+    {
+        double x = selRect.Left + 4;
+        double y = selRect.Top - overlayHeight - 4;
+
+        if (y < 0)
+            y = selRect.Top + 4;
+        if (ImageSource != null)
+        {
+            y = Clamp(y, 0, Math.Max(0, ImageSource.PixelSize.Height - overlayHeight));
+            x = Clamp(x, 0, Math.Max(0, ImageSource.PixelSize.Width - overlayWidth));
+        }
+
+        return new Point(x, y);
+    }
+
+    private void TryApplyTypedSize()
+    {
+        if (ImageSource == null || string.IsNullOrWhiteSpace(_sizeInputText))
+            return;
+
+        var parts = _sizeInputText.Split('x', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length != 2)
+            return;
+
+        if (!int.TryParse(parts[0], out int width) || !int.TryParse(parts[1], out int height))
+            return;
+
+        width = Math.Clamp(width, 1, ImageSource.PixelSize.Width);
+        height = Math.Clamp(height, 1, ImageSource.PixelSize.Height);
+
+        SelectionWidth = width;
+        SelectionHeight = height;
+        SelectionX = Clamp(SelectionX, 0, ImageSource.PixelSize.Width - SelectionWidth);
+        SelectionY = Clamp(SelectionY, 0, ImageSource.PixelSize.Height - SelectionHeight);
+    }
 }

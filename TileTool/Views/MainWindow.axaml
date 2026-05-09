@@ -107,6 +107,11 @@
                                    GhostY="{Binding GhostY}"
                                    GhostWidth="{Binding GhostWidth}"
                                    GhostHeight="{Binding GhostHeight}"
+                                   HasGrid="{Binding HasGrid}"
+                                   GridOriginX="{Binding GridOriginX}"
+                                   GridOriginY="{Binding GridOriginY}"
+                                   GridCellWidth="{Binding GridCellWidth}"
+                                   GridCellHeight="{Binding GridCellHeight}"
                                    HorizontalAlignment="Left"
                                    VerticalAlignment="Top"/>
             </ScrollViewer>

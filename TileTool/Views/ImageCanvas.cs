@@ -312,18 +312,9 @@ public class ImageCanvas : Control
 
     private DragMode GetDragMode(Point pos)
     {
-        var sel = GetSelectionRect();
-        double t = EdgeThreshold;
+        bool insideSelection = ClassifyPosition(pos, out var mode);
 
-        bool nearLeft = Math.Abs(pos.X - sel.Left) <= t;
-        bool nearRight = Math.Abs(pos.X - sel.Right) <= t;
-        bool nearTop = Math.Abs(pos.Y - sel.Top) <= t;
-        bool nearBottom = Math.Abs(pos.Y - sel.Bottom) <= t;
-
-        bool insideX = pos.X >= sel.Left - t && pos.X <= sel.Right + t;
-        bool insideY = pos.Y >= sel.Top - t && pos.Y <= sel.Bottom + t;
-
-        if (!insideX || !insideY)
+        if (!insideSelection)
         {
             // Outside selection — start a new creation drag
             if (ImageSource != null && pos.X >= 0 && pos.Y >= 0 &&
@@ -338,59 +329,53 @@ public class ImageCanvas : Control
             return DragMode.None;
         }
 
-        // Corners
-        if (nearLeft && nearTop) return DragMode.ResizeNW;
-        if (nearRight && nearTop) return DragMode.ResizeNE;
-        if (nearLeft && nearBottom) return DragMode.ResizeSW;
-        if (nearRight && nearBottom) return DragMode.ResizeSE;
-
-        // Edges
-        if (nearLeft) return DragMode.ResizeW;
-        if (nearRight) return DragMode.ResizeE;
-        if (nearTop) return DragMode.ResizeN;
-        if (nearBottom) return DragMode.ResizeS;
-
-        // Interior — move
-        return DragMode.Move;
+        return mode;
     }
 
     private Cursor GetCursorForPosition(Point pos)
     {
-        return GetDragModeForCursor(pos) switch
+        ClassifyPosition(pos, out var mode);
+        return mode switch
         {
             DragMode.Move => new Cursor(StandardCursorType.SizeAll),
             DragMode.ResizeN or DragMode.ResizeS => new Cursor(StandardCursorType.SizeNorthSouth),
             DragMode.ResizeE or DragMode.ResizeW => new Cursor(StandardCursorType.SizeWestEast),
             DragMode.ResizeNW or DragMode.ResizeSE => new Cursor(StandardCursorType.TopLeftCorner),
             DragMode.ResizeNE or DragMode.ResizeSW => new Cursor(StandardCursorType.TopRightCorner),
-            DragMode.Create => new Cursor(StandardCursorType.Cross),
             _ => new Cursor(StandardCursorType.Cross)
         };
     }
 
-    private DragMode GetDragModeForCursor(Point pos)
+    /// <summary>
+    /// Classifies where <paramref name="pos"/> is relative to the selection rectangle.
+    /// Returns <c>true</c> when <paramref name="pos"/> is inside (or on the border of) the
+    /// selection and sets <paramref name="mode"/> accordingly.  Returns <c>false</c> and
+    /// sets <paramref name="mode"/> to <see cref="DragMode.Create"/> when outside.
+    /// </summary>
+    private bool ClassifyPosition(Point pos, out DragMode mode)
     {
         var sel = GetSelectionRect();
         double t = EdgeThreshold;
 
-        bool nearLeft = Math.Abs(pos.X - sel.Left) <= t;
-        bool nearRight = Math.Abs(pos.X - sel.Right) <= t;
-        bool nearTop = Math.Abs(pos.Y - sel.Top) <= t;
+        bool nearLeft   = Math.Abs(pos.X - sel.Left)   <= t;
+        bool nearRight  = Math.Abs(pos.X - sel.Right)  <= t;
+        bool nearTop    = Math.Abs(pos.Y - sel.Top)    <= t;
         bool nearBottom = Math.Abs(pos.Y - sel.Bottom) <= t;
 
-        bool insideX = pos.X >= sel.Left - t && pos.X <= sel.Right + t;
-        bool insideY = pos.Y >= sel.Top - t && pos.Y <= sel.Bottom + t;
+        bool insideX = pos.X >= sel.Left - t && pos.X <= sel.Right  + t;
+        bool insideY = pos.Y >= sel.Top  - t && pos.Y <= sel.Bottom + t;
 
-        if (!insideX || !insideY) return DragMode.Create;
-        if (nearLeft && nearTop) return DragMode.ResizeNW;
-        if (nearRight && nearTop) return DragMode.ResizeNE;
-        if (nearLeft && nearBottom) return DragMode.ResizeSW;
-        if (nearRight && nearBottom) return DragMode.ResizeSE;
-        if (nearLeft) return DragMode.ResizeW;
-        if (nearRight) return DragMode.ResizeE;
-        if (nearTop) return DragMode.ResizeN;
-        if (nearBottom) return DragMode.ResizeS;
-        return DragMode.Move;
+        if (!insideX || !insideY) { mode = DragMode.Create; return false; }
+        if (nearLeft  && nearTop)    { mode = DragMode.ResizeNW; return true; }
+        if (nearRight && nearTop)    { mode = DragMode.ResizeNE; return true; }
+        if (nearLeft  && nearBottom) { mode = DragMode.ResizeSW; return true; }
+        if (nearRight && nearBottom) { mode = DragMode.ResizeSE; return true; }
+        if (nearLeft)   { mode = DragMode.ResizeW; return true; }
+        if (nearRight)  { mode = DragMode.ResizeE; return true; }
+        if (nearTop)    { mode = DragMode.ResizeN; return true; }
+        if (nearBottom) { mode = DragMode.ResizeS; return true; }
+        mode = DragMode.Move;
+        return true;
     }
 
     private Rect GetSelectionRect() =>

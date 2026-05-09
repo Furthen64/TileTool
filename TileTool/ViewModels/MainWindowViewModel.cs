@@ -150,6 +150,12 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
         }
 
+        if (ImageDisplayWidth <= 0 || ImageDisplayHeight <= 0)
+        {
+            StatusMessage = "Image display dimensions are invalid.";
+            return;
+        }
+
         try
         {
             // Compute the actual pixel coordinates on the original image
@@ -214,9 +220,10 @@ public partial class MainWindowViewModel : ViewModelBase
                     SelectionHeight = _config.DefaultSelectionHeight;
                 }
             }
-            catch
+            catch (JsonException ex)
             {
-                // Use defaults on parse error
+                // Config is corrupt — reset to defaults
+                StatusMessage = $"Config parse error: {ex.Message}. Resetting.";
                 InitConfig();
             }
         }
@@ -253,9 +260,13 @@ public partial class MainWindowViewModel : ViewModelBase
             var json = JsonSerializer.Serialize(_config, _jsonOptions);
             File.WriteAllText(configPath, json);
         }
-        catch
+        catch (IOException ex)
         {
-            // Ignore config save errors
+            StatusMessage = $"Could not save config: {ex.Message}";
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            StatusMessage = $"Config access denied: {ex.Message}";
         }
     }
 

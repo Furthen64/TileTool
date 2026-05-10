@@ -6,7 +6,7 @@ TileTool lets you select and extract tile-sized regions from larger images.
 
 1. Build and run:
    - `dotnet build`
-   - `dotnet run --project /home/runner/work/TileTool/TileTool/TileTool/TileTool.csproj`
+   - `dotnet run --project TileTool/TileTool.csproj`
 2. Choose an image.
 3. Choose an output folder.
 4. Drag or resize the selection rectangle.
@@ -22,8 +22,8 @@ TileTool lets you select and extract tile-sized regions from larger images.
 
 ## Build
 
-- Linux helper script: `/home/runner/work/TileTool/TileTool/build.sh`
-- Windows helper script: `/home/runner/work/TileTool/TileTool/winbuild.ps1`
+- Linux helper script: `build.sh`
+- Windows helper script: `winbuild.ps1`
 - Cross-platform CLI: `dotnet build`
 
 ## Known Limits

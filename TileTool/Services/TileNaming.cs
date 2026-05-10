@@ -7,6 +7,7 @@ namespace TileTool.Services;
 public static class TileNaming
 {
     private const string DefaultPrefix = "tile";
+    private static readonly char[] WindowsInvalidFileNameChars = ['<', '>', ':', '"', '/', '\\', '|', '?', '*'];
 
     public static string SanitizePrefix(string? prefix)
     {
@@ -15,7 +16,11 @@ public static class TileNaming
             : prefix.Trim();
 
         var invalid = Path.GetInvalidFileNameChars();
-        var sanitized = new string(normalized.Select(ch => invalid.Contains(ch) ? '_' : ch).ToArray()).Trim();
+        var sanitized = new string(
+            normalized
+                .Select(ch => invalid.Contains(ch) || WindowsInvalidFileNameChars.Contains(ch) ? '_' : ch)
+                .ToArray())
+            .Trim();
 
         if (string.IsNullOrWhiteSpace(sanitized) || sanitized.All(ch => ch is '.' or '_'))
             return DefaultPrefix;

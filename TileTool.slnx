@@ -1,3 +1,4 @@
 <Solution>
   <Project Path="TileTool/TileTool.csproj" />
+  <Project Path="TileTool.Tests/TileTool.Tests.csproj" />
 </Solution>

@@ -1,0 +1,115 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:TileTool.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        x:Class="TileTool.Views.ImagePickerDialog"
+        x:DataType="vm:ImagePickerViewModel"
+        Title="Open Image"
+        Width="860" Height="600"
+        MinWidth="600" MinHeight="400"
+        WindowStartupLocation="CenterOwner"
+        Background="#1E1E1E">
+
+    <Grid RowDefinitions="Auto,*,Auto">
+
+        <!-- Address / navigation bar -->
+        <Border Grid.Row="0" Background="#2D2D2D" Padding="8,6">
+            <DockPanel>
+                <Button DockPanel.Dock="Left"
+                        Content="⬆ Up"
+                        Command="{Binding NavigateUpCommand}"
+                        Margin="0,0,6,0" Padding="8,4"/>
+                <TextBox Text="{Binding CurrentPath}"
+                         IsReadOnly="True"
+                         Background="#1A1A1A"
+                         Foreground="White"
+                         BorderBrush="#555"
+                         VerticalContentAlignment="Center"/>
+            </DockPanel>
+        </Border>
+
+        <!-- Thumbnail grid -->
+        <ListBox Grid.Row="1"
+                 x:Name="ItemsList"
+                 ItemsSource="{Binding Items}"
+                 SelectedItem="{Binding SelectedItem}"
+                 Background="#1A1A1A"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                 ScrollViewer.VerticalScrollBarVisibility="Auto">
+            <ListBox.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal" Margin="4"/>
+                </ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+            <ListBox.ItemContainerTheme>
+                <ControlTheme TargetType="ListBoxItem" x:DataType="ListBoxItem">
+                    <Setter Property="Padding" Value="0"/>
+                    <Setter Property="Margin" Value="4"/>
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="Template">
+                        <ControlTemplate>
+                            <ContentPresenter Content="{TemplateBinding Content}"/>
+                        </ControlTemplate>
+                    </Setter>
+                </ControlTheme>
+            </ListBox.ItemContainerTheme>
+            <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:ImagePickerItemViewModel">
+                    <Border Width="130" Height="130"
+                            Background="#2A2A2A"
+                            CornerRadius="4"
+                            BorderThickness="2"
+                            BorderBrush="{Binding BorderColor}"
+                            Cursor="Hand">
+                        <Grid RowDefinitions="*,Auto">
+                            <Viewbox Grid.Row="0" Margin="8,8,8,4" Stretch="Uniform">
+                                <Panel>
+                                    <TextBlock Text="{Binding Icon}"
+                                               FontSize="48"
+                                               IsVisible="{Binding !HasThumbnail}"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"/>
+                                    <Image Source="{Binding Thumbnail}"
+                                           IsVisible="{Binding HasThumbnail}"
+                                           Stretch="Uniform"/>
+                                </Panel>
+                            </Viewbox>
+                            <TextBlock Grid.Row="1"
+                                       Text="{Binding Name}"
+                                       Foreground="White"
+                                       FontSize="11"
+                                       TextTrimming="CharacterEllipsis"
+                                       TextAlignment="Center"
+                                       Margin="4,0,4,6"
+                                       MaxLines="2"/>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <!-- Bottom bar -->
+        <Border Grid.Row="2" Background="#2D2D2D" Padding="8,6">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button Content="Open"
+                            Command="{Binding ConfirmCommand}"
+                            IsDefault="True"
+                            IsEnabled="{Binding CanConfirm}"
+                            Margin="0,0,6,0" Padding="16,6"/>
+                    <Button Content="Cancel"
+                            Command="{Binding CancelCommand}"
+                            IsCancel="True"
+                            Padding="16,6"/>
+                </StackPanel>
+                <TextBlock Text="{Binding SelectedFileName}"
+                           Foreground="#CCCCCC"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"/>
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>
+

@@ -61,6 +61,21 @@ public class ImageCanvas : Control
     public static readonly StyledProperty<double> GridCellHeightProperty =
         AvaloniaProperty.Register<ImageCanvas, double>(nameof(GridCellHeight), 0);
 
+    public static readonly StyledProperty<bool> HasOriginGhostProperty =
+        AvaloniaProperty.Register<ImageCanvas, bool>(nameof(HasOriginGhost), false);
+
+    public static readonly StyledProperty<double> OriginGhostXProperty =
+        AvaloniaProperty.Register<ImageCanvas, double>(nameof(OriginGhostX), 0);
+
+    public static readonly StyledProperty<double> OriginGhostYProperty =
+        AvaloniaProperty.Register<ImageCanvas, double>(nameof(OriginGhostY), 0);
+
+    public static readonly StyledProperty<double> OriginGhostWidthProperty =
+        AvaloniaProperty.Register<ImageCanvas, double>(nameof(OriginGhostWidth), 0);
+
+    public static readonly StyledProperty<double> OriginGhostHeightProperty =
+        AvaloniaProperty.Register<ImageCanvas, double>(nameof(OriginGhostHeight), 0);
+
     public Bitmap? ImageSource
     {
         get => GetValue(ImageSourceProperty);
@@ -151,6 +166,36 @@ public class ImageCanvas : Control
         set => SetValue(GridCellHeightProperty, value);
     }
 
+    public bool HasOriginGhost
+    {
+        get => GetValue(HasOriginGhostProperty);
+        set => SetValue(HasOriginGhostProperty, value);
+    }
+
+    public double OriginGhostX
+    {
+        get => GetValue(OriginGhostXProperty);
+        set => SetValue(OriginGhostXProperty, value);
+    }
+
+    public double OriginGhostY
+    {
+        get => GetValue(OriginGhostYProperty);
+        set => SetValue(OriginGhostYProperty, value);
+    }
+
+    public double OriginGhostWidth
+    {
+        get => GetValue(OriginGhostWidthProperty);
+        set => SetValue(OriginGhostWidthProperty, value);
+    }
+
+    public double OriginGhostHeight
+    {
+        get => GetValue(OriginGhostHeightProperty);
+        set => SetValue(OriginGhostHeightProperty, value);
+    }
+
     // ── Interaction State ────────────────────────────────────────────────────
 
     private enum DragMode { None, Move, ResizeN, ResizeS, ResizeE, ResizeW, ResizeNE, ResizeNW, ResizeSE, ResizeSW, Create }
@@ -169,6 +214,8 @@ public class ImageCanvas : Control
     private static readonly IPen SelectionPenSolid = new Pen(Brushes.CornflowerBlue, 1.5);
     private static readonly IPen GhostPen = new Pen(new SolidColorBrush(Color.FromArgb(180, 255, 165, 0)), 1.5, dashStyle: DashStyle.Dash);
     private static readonly IBrush GhostFill = new SolidColorBrush(Color.FromArgb(30, 255, 165, 0));
+    private static readonly IPen OriginGhostPen = new Pen(new SolidColorBrush(Color.FromArgb(200, 255, 255, 255)), 2.0, dashStyle: DashStyle.Dash);
+    private static readonly IBrush OriginGhostFill = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255));
     private static readonly IBrush HandleFill = Brushes.White;
     private static readonly IPen HandlePen = new Pen(Brushes.CornflowerBlue, 1.5);
     private static readonly IBrush LabelBackgroundBrush = new SolidColorBrush(Color.FromArgb(220, 26, 26, 26));
@@ -206,7 +253,12 @@ public class ImageCanvas : Control
             GridOriginXProperty,
             GridOriginYProperty,
             GridCellWidthProperty,
-            GridCellHeightProperty);
+            GridCellHeightProperty,
+            HasOriginGhostProperty,
+            OriginGhostXProperty,
+            OriginGhostYProperty,
+            OriginGhostWidthProperty,
+            OriginGhostHeightProperty);
 
         ImageSourceProperty.Changed.AddClassHandler<ImageCanvas>((canvas, _) => canvas.NormalizeSelectionToImageBounds());
         SelectionXProperty.Changed.AddClassHandler<ImageCanvas>((canvas, _) => canvas.NormalizeSelectionToImageBounds());
@@ -247,6 +299,14 @@ public class ImageCanvas : Control
         // Draw dark overlay around selection
         var selRect = GetSelectionRect();
         DrawDimOverlay(context, imgRect, selRect);
+
+        // Draw white origin ghost (marks where the first spacebar press occurred per tile size)
+        if (HasOriginGhost && OriginGhostWidth > 0 && OriginGhostHeight > 0)
+        {
+            var originRect = new Rect(OriginGhostX, OriginGhostY, OriginGhostWidth, OriginGhostHeight);
+            context.FillRectangle(OriginGhostFill, originRect);
+            context.DrawRectangle(null, OriginGhostPen, originRect.Inflate(0.5));
+        }
 
         // Draw ghost (previous saved selection)
         if (HasGhost && GhostWidth > 0 && GhostHeight > 0)

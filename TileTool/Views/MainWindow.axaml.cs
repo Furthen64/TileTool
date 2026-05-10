@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Input;
+using System;
 using TileTool.ViewModels;
 
 namespace TileTool.Views;
@@ -11,7 +12,7 @@ public partial class MainWindow : Window
         InitializeComponent();
     }
 
-    protected override void OnOpened(System.EventArgs e)
+    protected override void OnOpened(EventArgs e)
     {
         base.OnOpened(e);
         if (DataContext is MainWindowViewModel vm)
@@ -21,13 +22,21 @@ public partial class MainWindow : Window
         }
     }
 
-    protected override void OnKeyDown(KeyEventArgs e)
+    protected override async void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
         if (e.Key == Key.Space && DataContext is MainWindowViewModel vm)
         {
-            vm.SaveTile();
+            await vm.SaveTileAsync();
             e.Handled = true;
         }
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        if (DataContext is MainWindowViewModel vm)
+            vm.Dispose();
+
+        base.OnClosed(e);
     }
 }

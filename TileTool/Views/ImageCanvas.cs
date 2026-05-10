@@ -185,6 +185,7 @@ public class ImageCanvas : Control
 
     private bool _isSizeInputActive;
     private string _sizeInputText = string.Empty;
+    private bool _isNormalizingSelection;
 
     // ── Constructor ──────────────────────────────────────────────────────────
 
@@ -200,7 +201,18 @@ public class ImageCanvas : Control
             GhostXProperty,
             GhostYProperty,
             GhostWidthProperty,
-            GhostHeightProperty);
+            GhostHeightProperty,
+            HasGridProperty,
+            GridOriginXProperty,
+            GridOriginYProperty,
+            GridCellWidthProperty,
+            GridCellHeightProperty);
+
+        ImageSourceProperty.Changed.AddClassHandler<ImageCanvas>((canvas, _) => canvas.NormalizeSelectionToImageBounds());
+        SelectionXProperty.Changed.AddClassHandler<ImageCanvas>((canvas, _) => canvas.NormalizeSelectionToImageBounds());
+        SelectionYProperty.Changed.AddClassHandler<ImageCanvas>((canvas, _) => canvas.NormalizeSelectionToImageBounds());
+        SelectionWidthProperty.Changed.AddClassHandler<ImageCanvas>((canvas, _) => canvas.NormalizeSelectionToImageBounds());
+        SelectionHeightProperty.Changed.AddClassHandler<ImageCanvas>((canvas, _) => canvas.NormalizeSelectionToImageBounds());
     }
 
     public ImageCanvas()
@@ -589,6 +601,33 @@ public class ImageCanvas : Control
 
     private static double SnapAxis(double value, double origin, double cellSize) =>
         origin + Math.Round((value - origin) / cellSize) * cellSize;
+
+    private void NormalizeSelectionToImageBounds()
+    {
+        if (_isNormalizingSelection || ImageSource == null)
+            return;
+
+        _isNormalizingSelection = true;
+        try
+        {
+            double imgW = ImageSource.PixelSize.Width;
+            double imgH = ImageSource.PixelSize.Height;
+
+            var width = Clamp(Math.Round(SelectionWidth), 1, imgW);
+            var height = Clamp(Math.Round(SelectionHeight), 1, imgH);
+            var x = Clamp(Math.Round(SelectionX), 0, imgW - width);
+            var y = Clamp(Math.Round(SelectionY), 0, imgH - height);
+
+            SelectionWidth = width;
+            SelectionHeight = height;
+            SelectionX = x;
+            SelectionY = y;
+        }
+        finally
+        {
+            _isNormalizingSelection = false;
+        }
+    }
 
     private void DrawSelectionSizeLabel(DrawingContext context, Rect selRect)
     {

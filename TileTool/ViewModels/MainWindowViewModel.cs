@@ -1,21 +1,21 @@
-using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media.Imaging;
-using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System;
+using System.Diagnostics;
 using System.IO;
-using System.Text.Json;
 using System.Threading.Tasks;
 using TileTool.Models;
+using TileTool.Services;
 
 namespace TileTool.ViewModels;
 
-public partial class MainWindowViewModel : ViewModelBase
+public partial class MainWindowViewModel : ViewModelBase, IDisposable
 {
-    private const string ConfigFileName = "tiletool.json";
-    private readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = true };
+    private readonly IFilePickerService _filePickerService;
+    private readonly IConfigService _configService;
+    private readonly ITileSaveService _tileSaveService;
 
     [ObservableProperty]
     private Bitmap? _loadedImage;
@@ -87,7 +87,19 @@ public partial class MainWindowViewModel : ViewModelBase
     private double _gridCellHeight;
 
     private TileToolConfig _config = new();
-    private string? _currentImagePath;
+    private bool _isNormalizingSelection;
+
+    public MainWindowViewModel()
+        : this(new FilePickerService(), new ConfigService(), new TileSaveService())
+    {
+    }
+
+    public MainWindowViewModel(IFilePickerService filePickerService, IConfigService configService, ITileSaveService tileSaveService)
+    {
+        _filePickerService = filePickerService;
+        _configService = configService;
+        _tileSaveService = tileSaveService;
+    }
 
     // Window reference for dialogs
     public Window? OwnerWindow { get; set; }
@@ -95,86 +107,79 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     private async Task OpenImageAsync()
     {
-        if (OwnerWindow == null) return;
-
-        var files = await OwnerWindow.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        if (OwnerWindow == null)
         {
-            Title = "Open Image",
-            AllowMultiple = false,
-            FileTypeFilter = new[]
-            {
-                new FilePickerFileType("Images")
-                {
-                    Patterns = new[] { "*.png", "*.jpg", "*.jpeg", "*.bmp", "*.gif", "*.webp" }
-                },
-                FilePickerFileTypes.All
-            }
-        });
+            StatusMessage = "Window is not ready yet.";
+            return;
+        }
 
-        if (files.Count == 0) return;
+        var path = await _filePickerService.PickImageFileAsync(OwnerWindow);
+        if (string.IsNullOrWhiteSpace(path))
+            return;
 
-        var path = files[0].TryGetLocalPath();
-        if (path == null) return;
-
+        Bitmap? newBitmap = null;
         try
         {
-            LoadedImage?.Dispose();
-            LoadedImage = new Bitmap(path);
-            _currentImagePath = path;
-            HasImage = true;
+            newBitmap = new Bitmap(path);
+
+            var oldBitmap = LoadedImage;
+            LoadedImage = newBitmap;
+            newBitmap = null;
+            oldBitmap?.Dispose();
+
             ImageDisplayWidth = LoadedImage.PixelSize.Width;
             ImageDisplayHeight = LoadedImage.PixelSize.Height;
+            HasImage = true;
             HasGhost = false;
             HasGrid = false;
 
-            // Apply default selection size
             SelectionWidth = _config.DefaultSelectionWidth;
             SelectionHeight = _config.DefaultSelectionHeight;
             SelectionX = 0;
             SelectionY = 0;
+            ClampSelectionToImageBounds();
 
             StatusMessage = $"Image loaded: {Path.GetFileName(path)} ({LoadedImage.PixelSize.Width}x{LoadedImage.PixelSize.Height})";
         }
         catch (Exception ex)
         {
-            StatusMessage = $"Error loading image: {ex.Message}";
+            newBitmap?.Dispose();
+            Trace.TraceError("event=image_load_failed path={0} message={1}", path, ex.Message);
+            StatusMessage = $"Could not open image '{Path.GetFileName(path)}'. Ensure it is a supported and readable image file.";
         }
     }
 
     [RelayCommand]
     private async Task SelectOutputFolderAsync()
     {
-        if (OwnerWindow == null) return;
-
-        var folders = await OwnerWindow.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        if (OwnerWindow == null)
         {
-            Title = "Select Output Folder"
-        });
+            StatusMessage = "Window is not ready yet.";
+            return;
+        }
 
-        if (folders.Count == 0) return;
-
-        var path = folders[0].TryGetLocalPath();
-        if (path == null) return;
+        var path = await _filePickerService.PickOutputFolderAsync(OwnerWindow);
+        if (string.IsNullOrWhiteSpace(path))
+            return;
 
         OutputFolder = path;
         HasOutputFolder = true;
 
-        // Load or create config
-        LoadConfig();
+        await LoadConfigAsync();
 
         StatusMessage = $"Output folder set: {path}";
     }
 
     [RelayCommand]
-    private void SaveDefaultSize()
+    private async Task SaveDefaultSizeAsync()
     {
-        _config.DefaultSelectionWidth = (int)Math.Round(SelectionWidth);
-        _config.DefaultSelectionHeight = (int)Math.Round(SelectionHeight);
-        SaveConfig();
+        _config.DefaultSelectionWidth = (int)Math.Round(Math.Max(1, SelectionWidth));
+        _config.DefaultSelectionHeight = (int)Math.Round(Math.Max(1, SelectionHeight));
+        await SaveConfigAsync();
         StatusMessage = $"Default size saved: {_config.DefaultSelectionWidth}x{_config.DefaultSelectionHeight}";
     }
 
-    public void SaveTile()
+    public async Task SaveTileAsync()
     {
         if (!HasImage || !HasOutputFolder || LoadedImage == null)
         {
@@ -188,149 +193,186 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
         }
 
-        // Snapshot the current selection — this is what gets saved and becomes the ghost
-        double snapX = SelectionX;
-        double snapY = SelectionY;
-        double snapW = SelectionWidth;
-        double snapH = SelectionHeight;
+        var snap = SelectionBounds.Clamp(
+            new SelectionRect(SelectionX, SelectionY, SelectionWidth, SelectionHeight),
+            ImageDisplayWidth,
+            ImageDisplayHeight);
 
-        // Record the snapshot as the ghost overlay
-        GhostX = snapX;
-        GhostY = snapY;
-        GhostWidth = snapW;
-        GhostHeight = snapH;
+        SelectionX = snap.X;
+        SelectionY = snap.Y;
+        SelectionWidth = snap.Width;
+        SelectionHeight = snap.Height;
+
+        GhostX = snap.X;
+        GhostY = snap.Y;
+        GhostWidth = snap.Width;
+        GhostHeight = snap.Height;
         HasGhost = true;
 
-        // Establish (or update) the active grid from this saved tile
-        GridOriginX = snapX;
-        GridOriginY = snapY;
-        GridCellWidth = snapW;
-        GridCellHeight = snapH;
+        GridOriginX = snap.X;
+        GridOriginY = snap.Y;
+        GridCellWidth = snap.Width;
+        GridCellHeight = snap.Height;
         HasGrid = true;
 
-        // Advance selection right by one tile width if it stays within the image
-        double nextX = snapX + snapW;
-        if (nextX + snapW <= ImageDisplayWidth)
+        double nextX = snap.X + snap.Width;
+        if (nextX + snap.Width <= ImageDisplayWidth)
             SelectionX = nextX;
 
         try
         {
-            // Compute the actual pixel coordinates on the original image
-            double scaleX = LoadedImage.PixelSize.Width / ImageDisplayWidth;
-            double scaleY = LoadedImage.PixelSize.Height / ImageDisplayHeight;
-
-            int srcX = (int)Math.Round(snapX * scaleX);
-            int srcY = (int)Math.Round(snapY * scaleY);
-            int srcW = (int)Math.Round(snapW * scaleX);
-            int srcH = (int)Math.Round(snapH * scaleY);
-
-            // Clamp to image bounds
-            srcX = Math.Max(0, Math.Min(srcX, LoadedImage.PixelSize.Width - 1));
-            srcY = Math.Max(0, Math.Min(srcY, LoadedImage.PixelSize.Height - 1));
-            srcW = Math.Max(1, Math.Min(srcW, LoadedImage.PixelSize.Width - srcX));
-            srcH = Math.Max(1, Math.Min(srcH, LoadedImage.PixelSize.Height - srcY));
-
-            // Render the cropped region
-            var renderTarget = new RenderTargetBitmap(new PixelSize(srcW, srcH), new Vector(96, 96));
-            using (var ctx = renderTarget.CreateDrawingContext())
-            {
-                var srcRect = new Rect(srcX, srcY, srcW, srcH);
-                var dstRect = new Rect(0, 0, srcW, srcH);
-                ctx.DrawImage(LoadedImage, srcRect, dstRect);
-            }
-
-            // Generate filename
-            string safePrefix = string.IsNullOrWhiteSpace(Prefix) ? "tile" : Prefix.Trim();
-            string fileName = $"{safePrefix}_{NextTileIndex:D4}.png";
-            string filePath = Path.Combine(OutputFolder, fileName);
-
-            renderTarget.Save(filePath);
-            renderTarget.Dispose();
+            var result = await _tileSaveService.SaveTileAsync(
+                LoadedImage,
+                OutputFolder,
+                Prefix,
+                NextTileIndex,
+                snap,
+                ImageDisplayWidth,
+                ImageDisplayHeight);
 
             NextTileIndex++;
             _config.NextTileIndex = NextTileIndex;
-            SaveConfig();
+            await SaveConfigAsync();
 
-            StatusMessage = $"Saved: {fileName} ({srcW}x{srcH}px)";
+            StatusMessage = $"Saved: {result.FileName} ({result.SavedWidth}x{result.SavedHeight}px)";
         }
         catch (Exception ex)
         {
-            StatusMessage = $"Error saving tile: {ex.Message}";
+            Trace.TraceError("event=tile_save_failed folder={0} message={1}", OutputFolder, ex.Message);
+            StatusMessage = "Tile save failed. Check folder permissions, available disk space, and filename settings.";
         }
     }
 
-    private void LoadConfig()
+    private async Task LoadConfigAsync()
     {
-        var configPath = Path.Combine(OutputFolder, ConfigFileName);
-        if (File.Exists(configPath))
+        try
         {
-            try
-            {
-                var json = File.ReadAllText(configPath);
-                var cfg = JsonSerializer.Deserialize<TileToolConfig>(json, _jsonOptions);
-                if (cfg != null)
-                {
-                    _config = cfg;
-                    Prefix = _config.Prefix;
-                    NextTileIndex = _config.NextTileIndex;
-                    SelectionWidth = _config.DefaultSelectionWidth;
-                    SelectionHeight = _config.DefaultSelectionHeight;
-                }
-            }
-            catch (JsonException ex)
-            {
-                // Config is corrupt — reset to defaults
-                StatusMessage = $"Config parse error: {ex.Message}. Resetting.";
-                InitConfig();
-            }
+            var cfg = await _configService.LoadAsync(OutputFolder);
+            _config = cfg;
+
+            Prefix = TileNaming.SanitizePrefix(_config.Prefix);
+            NextTileIndex = Math.Max(1, _config.NextTileIndex);
+            SelectionWidth = Math.Max(1, _config.DefaultSelectionWidth);
+            SelectionHeight = Math.Max(1, _config.DefaultSelectionHeight);
+
+            ClampSelectionToImageBounds();
         }
-        else
+        catch (InvalidDataException ex)
         {
-            InitConfig();
+            Trace.TraceWarning("event=config_invalid folder={0} message={1}", OutputFolder, ex.Message);
+            StatusMessage = "Output-folder config is invalid and was reset to defaults.";
+            await InitConfigAsync();
+        }
+        catch (IOException ex)
+        {
+            Trace.TraceError("event=config_load_io_failed folder={0} message={1}", OutputFolder, ex.Message);
+            StatusMessage = "Could not read output-folder config; defaults were applied for this session.";
+            await InitConfigAsync();
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            Trace.TraceError("event=config_load_access_denied folder={0} message={1}", OutputFolder, ex.Message);
+            StatusMessage = "Cannot access output-folder config due to permissions; defaults were applied.";
+            await InitConfigAsync();
         }
     }
 
-    private void InitConfig()
+    private async Task InitConfigAsync()
     {
         _config = new TileToolConfig
         {
             OutputFolder = OutputFolder,
-            Prefix = Prefix,
-            DefaultSelectionWidth = (int)SelectionWidth,
-            DefaultSelectionHeight = (int)SelectionHeight,
+            Prefix = TileNaming.SanitizePrefix(Prefix),
+            DefaultSelectionWidth = (int)Math.Round(Math.Max(1, SelectionWidth)),
+            DefaultSelectionHeight = (int)Math.Round(Math.Max(1, SelectionHeight)),
             NextTileIndex = 1
         };
         NextTileIndex = 1;
-        SaveConfig();
+
+        await SaveConfigAsync();
     }
 
-    private void SaveConfig()
+    private async Task SaveConfigAsync()
     {
-        if (string.IsNullOrEmpty(OutputFolder)) return;
+        if (string.IsNullOrWhiteSpace(OutputFolder))
+            return;
+
         _config.OutputFolder = OutputFolder;
-        _config.Prefix = Prefix;
-        _config.NextTileIndex = NextTileIndex;
+        _config.Prefix = TileNaming.SanitizePrefix(Prefix);
+        _config.NextTileIndex = Math.Max(1, NextTileIndex);
+        _config.DefaultSelectionWidth = (int)Math.Round(Math.Max(1, SelectionWidth));
+        _config.DefaultSelectionHeight = (int)Math.Round(Math.Max(1, SelectionHeight));
 
         try
         {
-            var configPath = Path.Combine(OutputFolder, ConfigFileName);
-            var json = JsonSerializer.Serialize(_config, _jsonOptions);
-            File.WriteAllText(configPath, json);
+            await _configService.SaveAsync(OutputFolder, _config);
         }
         catch (IOException ex)
         {
-            StatusMessage = $"Could not save config: {ex.Message}";
+            Trace.TraceError("event=config_save_io_failed folder={0} message={1}", OutputFolder, ex.Message);
+            StatusMessage = "Could not save config due to an I/O error.";
         }
         catch (UnauthorizedAccessException ex)
         {
-            StatusMessage = $"Config access denied: {ex.Message}";
+            Trace.TraceError("event=config_save_access_denied folder={0} message={1}", OutputFolder, ex.Message);
+            StatusMessage = "Could not save config due to insufficient folder permissions.";
         }
     }
 
+    private void ClampSelectionToImageBounds()
+    {
+        if (_isNormalizingSelection)
+            return;
+
+        if (ImageDisplayWidth <= 0 || ImageDisplayHeight <= 0)
+            return;
+
+        _isNormalizingSelection = true;
+        try
+        {
+            var clamped = SelectionBounds.Clamp(
+                new SelectionRect(SelectionX, SelectionY, SelectionWidth, SelectionHeight),
+                ImageDisplayWidth,
+                ImageDisplayHeight);
+
+            SelectionX = clamped.X;
+            SelectionY = clamped.Y;
+            SelectionWidth = clamped.Width;
+            SelectionHeight = clamped.Height;
+        }
+        finally
+        {
+            _isNormalizingSelection = false;
+        }
+    }
+
+    public void DisposeLoadedImage()
+    {
+        LoadedImage?.Dispose();
+        LoadedImage = null;
+        HasImage = false;
+        HasGhost = false;
+        HasGrid = false;
+        ImageDisplayWidth = 0;
+        ImageDisplayHeight = 0;
+    }
+
+    public void Dispose() => DisposeLoadedImage();
+
     partial void OnPrefixChanged(string value)
     {
-        _config.Prefix = value;
-        SaveConfig();
-    }
-}
+        var sanitized = TileNaming.SanitizePrefix(value);
+        if (!string.Equals(value, sanitized, StringComparison.Ordinal))
+        {
+            Prefix = sanitized;
+            return;
+        }
 
+        _ = SaveConfigAsync();
+    }
+
+    partial void OnSelectionXChanged(double value) => ClampSelectionToImageBounds();
+    partial void OnSelectionYChanged(double value) => ClampSelectionToImageBounds();
+    partial void OnSelectionWidthChanged(double value) => ClampSelectionToImageBounds();
+    partial void OnSelectionHeightChanged(double value) => ClampSelectionToImageBounds();
+}

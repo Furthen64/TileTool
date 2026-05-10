@@ -6,12 +6,15 @@ using System;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace TileTool.ViewModels;
 
 public partial class ImagePickerItemViewModel : ObservableObject
 {
+    private static readonly SemaphoreSlim ThrottleSemaphore = new(4, 4);
+
     [ObservableProperty]
     private Bitmap? _thumbnail;
 
@@ -36,6 +39,7 @@ public partial class ImagePickerItemViewModel : ObservableObject
     public async Task LoadThumbnailAsync()
     {
         if (IsFolder) return;
+        await ThrottleSemaphore.WaitAsync();
         try
         {
             await Task.Run(() =>
@@ -49,7 +53,7 @@ public partial class ImagePickerItemViewModel : ObservableObject
                 int tw = Math.Max(1, (int)(srcW * scale));
                 int th = Math.Max(1, (int)(srcH * scale));
 
-                var thumb = full.CreateScaledBitmap(new Avalonia.PixelSize(tw, th), Avalonia.Media.Imaging.BitmapInterpolationMode.LowQuality);
+                var thumb = full.CreateScaledBitmap(new Avalonia.PixelSize(tw, th), Avalonia.Media.Imaging.BitmapInterpolationMode.MediumQuality);
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
                     Thumbnail = thumb;
@@ -60,6 +64,10 @@ public partial class ImagePickerItemViewModel : ObservableObject
         catch (Exception ex)
         {
             Trace.TraceWarning("event=thumbnail_load_failed path={0} message={1}", FullPath, ex.Message);
+        }
+        finally
+        {
+            ThrottleSemaphore.Release();
         }
     }
 }
@@ -149,6 +157,23 @@ public partial class ImagePickerViewModel : ObservableObject
         CloseRequested?.Invoke(false);
     }
 
+    private static bool IsHidden(string path)
+    {
+        // Unix: names starting with '.'
+        var name = Path.GetFileName(path);
+        if (!string.IsNullOrEmpty(name) && name.StartsWith('.'))
+            return true;
+        // Windows: Hidden file attribute
+        try
+        {
+            return (File.GetAttributes(path) & FileAttributes.Hidden) != 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private void Navigate(string path)
     {
         if (!Directory.Exists(path)) return;
@@ -163,8 +188,7 @@ public partial class ImagePickerViewModel : ObservableObject
             // Folders first
             foreach (var dir in Directory.EnumerateDirectories(path))
             {
-                var name = Path.GetFileName(dir);
-                if (!string.IsNullOrEmpty(name) && !name.StartsWith('.'))
+                if (!IsHidden(dir))
                     newItems.Add(new ImagePickerItemViewModel(dir, isFolder: true));
             }
 
@@ -173,7 +197,7 @@ public partial class ImagePickerViewModel : ObservableObject
             foreach (var file in Directory.EnumerateFiles(path))
             {
                 var ext = Path.GetExtension(file).ToLowerInvariant();
-                if (Array.IndexOf(ImageExtensions, ext) >= 0)
+                if (!IsHidden(file) && Array.IndexOf(ImageExtensions, ext) >= 0)
                     imageItems.Add(new ImagePickerItemViewModel(file, isFolder: false));
             }
 

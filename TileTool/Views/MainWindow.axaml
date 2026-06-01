@@ -117,7 +117,6 @@
             </ScrollViewer>
 
             <Border IsVisible="{Binding HasImage}"
-                    Panel.ZIndex="10"
                     HorizontalAlignment="Right"
                     VerticalAlignment="Top"
                     Margin="16"

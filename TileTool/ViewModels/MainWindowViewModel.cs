@@ -94,6 +94,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty]
     private string _snappingStatusText = "Snapping inactive";
+
+    [ObservableProperty]
     private bool _hasOriginGhost;
 
     [ObservableProperty]

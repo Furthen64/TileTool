@@ -10,6 +10,10 @@ $Project = "TileTool\TileTool.csproj"
 Write-Host "=== TileTool Windows Build ===" -ForegroundColor Cyan
 Write-Host "Restoring packages..."
 dotnet restore $Project
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Restore failed." -ForegroundColor Red
+    exit $LASTEXITCODE
+}
 
 Write-Host "Building release..."
 dotnet publish $Project `
@@ -19,6 +23,12 @@ dotnet publish $Project `
     --output $Output `
     -p:PublishSingleFile=true `
     -p:IncludeNativeLibrariesForSelfExtract=true
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host ""
+    Write-Host "Build failed." -ForegroundColor Red
+    exit $LASTEXITCODE
+}
 
 Write-Host ""
 Write-Host "Done! Binary available at: $Output\TileTool.exe" -ForegroundColor Green

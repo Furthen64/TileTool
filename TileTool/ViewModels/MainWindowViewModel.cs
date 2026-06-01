@@ -94,9 +94,26 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty]
     private string _snappingStatusText = "Snapping inactive";
+    private bool _hasOriginGhost;
+
+    [ObservableProperty]
+    private double _originGhostX;
+
+    [ObservableProperty]
+    private double _originGhostY;
+
+    [ObservableProperty]
+    private double _originGhostWidth;
+
+    [ObservableProperty]
+    private double _originGhostHeight;
 
     private TileToolConfig _config = new();
     private bool _isNormalizingSelection;
+
+    // Track selection size at the time origin ghost was placed so we know when to reset it
+    private double _originGhostSetWidth = -1;
+    private double _originGhostSetHeight = -1;
 
     public MainWindowViewModel()
         : this(new FilePickerService(), new ConfigService(), new TileSaveService())
@@ -142,6 +159,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             HasImage = true;
             HasGhost = false;
             HasGrid = false;
+            HasOriginGhost = false;
+            _originGhostSetWidth = -1;
+            _originGhostSetHeight = -1;
 
             SelectionWidth = _config.DefaultSelectionWidth;
             SelectionHeight = _config.DefaultSelectionHeight;
@@ -218,6 +238,20 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         GhostWidth = snap.Width;
         GhostHeight = snap.Height;
         HasGhost = true;
+
+        // Set the white origin ghost the first time spacebar is pressed,
+        // or whenever the selection size has changed since the last origin was recorded.
+        bool sizeChanged = snap.Width != _originGhostSetWidth || snap.Height != _originGhostSetHeight;
+        if (!HasOriginGhost || sizeChanged)
+        {
+            OriginGhostX = snap.X;
+            OriginGhostY = snap.Y;
+            OriginGhostWidth = snap.Width;
+            OriginGhostHeight = snap.Height;
+            HasOriginGhost = true;
+            _originGhostSetWidth = snap.Width;
+            _originGhostSetHeight = snap.Height;
+        }
 
         GridOriginX = snap.X;
         GridOriginY = snap.Y;
@@ -381,6 +415,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         HasImage = false;
         HasGhost = false;
         HasGrid = false;
+        HasOriginGhost = false;
+        _originGhostSetWidth = -1;
+        _originGhostSetHeight = -1;
         ImageDisplayWidth = 0;
         ImageDisplayHeight = 0;
     }

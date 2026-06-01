@@ -11,11 +11,13 @@ TileTool lets you select and extract tile-sized regions from larger images.
 3. Choose an output folder.
 4. Drag or resize the selection rectangle.
 5. Press `Space` to save a tile.
+6. Use the floating quick tools panel to save again or pause/resume snapping.
 
 ## Features
 
 - Interactive selection rectangle with drag/resize handles
-- Optional grid snapping after first save
+- Floating quick tools panel for save/snapping controls
+- Optional grid snapping after first save, with pause/resume control
 - Per-output-folder config (`tiletool.json`) for prefix/default size/index
 - Typed size input directly on the canvas (`WxH`, then Enter)
 - Sequential PNG export with safe filename sanitization

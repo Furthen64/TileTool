@@ -87,6 +87,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private double _gridCellHeight;
 
     [ObservableProperty]
+    private bool _canToggleSnapping;
+
+    [ObservableProperty]
+    private string _snappingButtonText = "Resume Snapping";
+
+    [ObservableProperty]
+    private string _snappingStatusText = "Snapping inactive";
     private bool _hasOriginGhost;
 
     [ObservableProperty]
@@ -118,6 +125,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _filePickerService = filePickerService;
         _configService = configService;
         _tileSaveService = tileSaveService;
+        UpdateSnappingUi();
     }
 
     // Window reference for dialogs
@@ -279,6 +287,24 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
     }
 
+    [RelayCommand]
+    private async Task SaveTileFromToolbarAsync() => await SaveTileAsync();
+
+    [RelayCommand]
+    private void ToggleSnapping()
+    {
+        if (!CanToggleSnapping)
+        {
+            StatusMessage = "Save a tile first to enable snapping.";
+            return;
+        }
+
+        HasGrid = !HasGrid;
+        StatusMessage = HasGrid
+            ? "Snapping resumed."
+            : "Snapping paused. Drag freely or save again to re-anchor the snap grid.";
+    }
+
     private async Task LoadConfigAsync()
     {
         try
@@ -414,4 +440,19 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     partial void OnSelectionYChanged(double value) => ClampSelectionToImageBounds();
     partial void OnSelectionWidthChanged(double value) => ClampSelectionToImageBounds();
     partial void OnSelectionHeightChanged(double value) => ClampSelectionToImageBounds();
+    partial void OnHasGhostChanged(bool value) => UpdateSnappingUi();
+    partial void OnHasGridChanged(bool value) => UpdateSnappingUi();
+    partial void OnGridCellWidthChanged(double value) => UpdateSnappingUi();
+    partial void OnGridCellHeightChanged(double value) => UpdateSnappingUi();
+
+    private void UpdateSnappingUi()
+    {
+        CanToggleSnapping = HasGhost && GridCellWidth > 0 && GridCellHeight > 0;
+        SnappingButtonText = HasGrid ? "Stop Snapping" : "Resume Snapping";
+        SnappingStatusText = HasGrid
+            ? "Snapping active"
+            : CanToggleSnapping
+                ? "Snapping paused"
+                : "Snapping inactive";
+    }
 }
